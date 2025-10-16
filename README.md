@@ -1,0 +1,232 @@
+# Solo Base Notes - Backend API
+
+Backend GraphQL API for managing anime extracts for Solo Geek YouTube channel.
+
+## Features
+
+- GraphQL API with Apollo Server
+- Google OAuth authentication
+- MongoDB database
+- MyAnimeList & Jikan API integration
+- Extract management with themes and characters
+- Character search by anime
+
+## Tech Stack
+
+- Node.js + Express
+- Apollo Server (GraphQL)
+- MongoDB + Mongoose
+- Passport.js (Google OAuth)
+- JWT authentication
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v18+)
+- MongoDB (local or cloud)
+- Google OAuth credentials
+
+### Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Create `.env` file (copy from `.env.example`):
+```bash
+cp .env.example .env
+```
+
+3. Configure your `.env` file with:
+   - MongoDB URI
+   - Google OAuth credentials (get from Google Cloud Console)
+   - JWT secret
+   - Port and frontend URL
+
+### Get Google OAuth Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable Google+ API
+4. Create OAuth 2.0 credentials
+5. Add authorized redirect URI: `http://localhost:4000/auth/google/callback`
+6. Copy Client ID and Client Secret to `.env`
+
+### Run the Server
+
+Development mode:
+```bash
+npm run dev
+```
+
+Production mode:
+```bash
+npm start
+```
+
+The server will start at `http://localhost:4000`
+
+- GraphQL Playground: `http://localhost:4000/graphql`
+- Google Login: `http://localhost:4000/auth/google`
+
+## GraphQL API
+
+### Authentication
+
+All queries and mutations (except anime search) require authentication. Include JWT token in headers:
+
+```
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+### Main Queries
+
+```graphql
+# Get current user
+query {
+  me {
+    id
+    name
+    email
+  }
+}
+
+# Search anime
+query {
+  searchAnime(query: "Demon Slayer", source: JIKAN) {
+    id
+    title
+    image
+  }
+}
+
+# Get anime characters
+query {
+  getAnimeCharacters(animeId: 38000, source: JIKAN) {
+    malId
+    name
+    image
+  }
+}
+
+# Get all extracts
+query {
+  extracts {
+    id
+    text
+    characters {
+      name
+    }
+    animeTitle
+  }
+}
+
+# Get all themes
+query {
+  themes {
+    id
+    name
+    color
+  }
+}
+```
+
+### Main Mutations
+
+```graphql
+# Create theme
+mutation {
+  createTheme(input: {
+    name: "Courage"
+    description: "Extraits sur le courage"
+    color: "#FF6B6B"
+  }) {
+    id
+    name
+  }
+}
+
+# Create extract
+mutation {
+  createExtract(input: {
+    text: "Ne pleure pas... ne laisse pas le désespoir t'envahir !"
+    characters: [{
+      malId: 146156
+      name: "Giyuu Tomioka"
+    }]
+    animeId: 38000
+    animeTitle: "Demon Slayer"
+    animeImage: "https://..."
+    apiSource: JIKAN
+    timing: {
+      start: "12:30"
+      end: "13:45"
+    }
+    season: 1
+    episode: 1
+    themeId: "..."
+  }) {
+    id
+    text
+  }
+}
+```
+
+## Project Structure
+
+```
+solo-base-notes/
+├── config/
+│   ├── database.js          # MongoDB connection
+│   └── passport.js          # Google OAuth config
+├── graphql/
+│   ├── typeDefs.js          # GraphQL schema
+│   └── resolvers.js         # GraphQL resolvers
+├── middleware/
+│   └── auth.js              # JWT authentication
+├── models/
+│   ├── User.js              # User schema
+│   ├── Extract.js           # Extract schema
+│   └── Theme.js             # Theme schema
+├── routes/
+│   └── auth.js              # OAuth routes
+├── services/
+│   ├── jikanService.js      # Jikan API integration
+│   └── malService.js        # MyAnimeList API integration
+├── .env.example             # Environment variables template
+├── server.js                # Main server file
+└── package.json
+```
+
+## Database Models
+
+### User
+- googleId, email, name, avatar
+- Automatically created on first Google login
+
+### Theme
+- name, description, color
+- User-specific themes for video categories
+
+### Extract
+- text, characters, animeId, timing, season, episode
+- Links to theme and user
+- Stores anime metadata (title, image)
+
+## API Sources
+
+### Jikan API (Default)
+- Free, no authentication required
+- Full anime and character data
+- Rate limit: 3 requests/second
+
+### MyAnimeList API
+- Requires client ID
+- More accurate data
+- No character endpoint (use Jikan for characters)
+
+## License
+
+MIT
