@@ -5,8 +5,82 @@ export const typeDefs = `#graphql
     email: String!
     name: String!
     avatar: String
+    youtubeChannelUrl: String
     createdAt: String!
     lastLogin: String!
+  }
+
+  type Settings {
+    id: ID!
+    youtubeChannelUrl: String
+    updatedAt: String!
+    updatedBy: ID
+  }
+
+  type YouTubeChannel {
+    id: String!
+    title: String!
+    description: String
+    customUrl: String
+    thumbnail: String!
+    subscriberCount: Int!
+    videoCount: Int!
+    viewCount: Int!
+    bannerUrl: String
+  }
+
+  type YouTubeVideo {
+    id: String!
+    title: String!
+    description: String
+    thumbnail: String!
+    publishedAt: String!
+    duration: String!
+    durationInSeconds: Int!
+    isShort: Boolean!
+    viewCount: Int!
+    likeCount: Int!
+    commentCount: Int!
+  }
+
+  type SpotifyArtist {
+    id: String!
+    name: String!
+  }
+
+  type SpotifyAlbum {
+    id: String!
+    name: String!
+    image: String
+  }
+
+  type SpotifyTrack {
+    id: String!
+    name: String!
+    artists: [SpotifyArtist!]!
+    album: SpotifyAlbum!
+    duration: Int!
+    previewUrl: String
+    spotifyUrl: String!
+    uri: String!
+  }
+
+  type VideoSegment {
+    extractId: ID!
+    text: String!
+    order: Int!
+  }
+
+  type Video {
+    id: ID!
+    title: String!
+    description: String!
+    tags: String!
+    segments: [VideoSegment!]!
+    musicTracks: [SpotifyTrack!]!
+    userId: ID!
+    createdAt: String!
+    updatedAt: String!
   }
 
   type Character {
@@ -121,6 +195,50 @@ export const typeDefs = `#graphql
     color: String
   }
 
+  input VideoSegmentInput {
+    extractId: ID!
+    text: String!
+    order: Int!
+  }
+
+  input SpotifyArtistInput {
+    id: String!
+    name: String!
+  }
+
+  input SpotifyAlbumInput {
+    id: String!
+    name: String!
+    image: String
+  }
+
+  input SpotifyTrackInput {
+    id: String!
+    name: String!
+    artists: [SpotifyArtistInput!]!
+    album: SpotifyAlbumInput!
+    duration: Int!
+    previewUrl: String
+    spotifyUrl: String!
+    uri: String!
+  }
+
+  input CreateVideoInput {
+    title: String!
+    description: String!
+    tags: String!
+    segments: [VideoSegmentInput!]!
+    musicTracks: [SpotifyTrackInput!]
+  }
+
+  input UpdateVideoInput {
+    title: String
+    description: String
+    tags: String
+    segments: [VideoSegmentInput!]
+    musicTracks: [SpotifyTrackInput!]
+  }
+
   type AuthPayload {
     token: String!
     user: User!
@@ -129,6 +247,9 @@ export const typeDefs = `#graphql
   type Query {
     # Auth
     me: User
+
+    # Settings
+    settings: Settings!
 
     # Extracts
     extracts(themeId: ID, animeId: Int, limit: Int, offset: Int): [Extract!]!
@@ -143,6 +264,18 @@ export const typeDefs = `#graphql
     getAnime(id: Int!, source: APISource!): Anime
     getAnimeCharacters(animeId: Int!, source: APISource!): [Character!]!
     getAnimeEpisodes(animeId: Int!, source: APISource!): [Episode!]!
+
+    # YouTube
+    getYouTubeChannelInfo(url: String!): YouTubeChannel!
+    getYouTubeChannelVideos(url: String!, maxResults: Int): [YouTubeVideo!]!
+
+    # Spotify
+    searchSpotifyTracks(query: String!, limit: Int): [SpotifyTrack!]!
+    getSpotifyTrack(trackId: String!): SpotifyTrack
+
+    # Videos
+    videos(limit: Int, offset: Int): [Video!]!
+    video(id: ID!): Video
   }
 
   type Mutation {
@@ -155,5 +288,16 @@ export const typeDefs = `#graphql
     createTheme(input: CreateThemeInput!): Theme!
     updateTheme(id: ID!, input: UpdateThemeInput!): Theme!
     deleteTheme(id: ID!): Boolean!
+
+    # Settings
+    updateSettings(youtubeChannelUrl: String): Settings!
+
+    # User (deprecated - kept for backward compatibility)
+    updateYouTubeChannelUrl(url: String!): User!
+
+    # Videos
+    createVideo(input: CreateVideoInput!): Video!
+    updateVideo(id: ID!, input: UpdateVideoInput!): Video!
+    deleteVideo(id: ID!): Boolean!
   }
 `;
