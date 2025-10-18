@@ -2,6 +2,7 @@ import Extract from '../models/Extract.js';
 import Theme from '../models/Theme.js';
 import User from '../models/User.js';
 import Video from '../models/Video.js';
+import PublishedVideo from '../models/PublishedVideo.js';
 import Settings from '../models/Settings.js';
 import jikanService from '../services/jikanService.js';
 import malService from '../services/malService.js';
@@ -142,6 +143,31 @@ export const resolvers = {
       const video = await Video.findById(id); // Remove userId filter
       if (!video) throw new Error('Video not found');
       return video;
+    },
+
+    // Published Videos
+    publishedVideos: async (_, { limit = 50, offset = 0 }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      return await PublishedVideo.find({})
+        .sort({ publishedAt: -1 })
+        .limit(limit)
+        .skip(offset);
+    },
+
+    publishedVideo: async (_, { id }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const publishedVideo = await PublishedVideo.findById(id);
+      if (!publishedVideo) throw new Error('Published video not found');
+      return publishedVideo;
+    },
+
+    publishedVideoByYoutubeId: async (_, { youtubeVideoId }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const publishedVideo = await PublishedVideo.findOne({ youtubeVideoId });
+      return publishedVideo; // Can be null if not found
     },
   },
 
@@ -290,6 +316,58 @@ export const resolvers = {
       const result = await Video.deleteOne({ _id: id }); // Remove userId filter
       return result.deletedCount > 0;
     },
+
+    publishVideo: async (_, { id, youtubeVideoId }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const video = await Video.findByIdAndUpdate(
+        id,
+        { isPublished: true, youtubeVideoId, updatedAt: Date.now() },
+        { new: true }
+      );
+
+      if (!video) throw new Error('Video not found');
+      return video;
+    },
+
+    // Published Videos
+    linkPublishedVideo: async (_, { input }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Check if video already exists
+      const existing = await PublishedVideo.findOne({ youtubeVideoId: input.youtubeVideoId });
+      if (existing) {
+        throw new Error('This YouTube video is already linked');
+      }
+
+      const publishedVideo = new PublishedVideo({
+        ...input,
+        userId: user.id,
+      });
+
+      await publishedVideo.save();
+      return await PublishedVideo.findById(publishedVideo._id);
+    },
+
+    updatePublishedVideo: async (_, { id, extractIds }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const publishedVideo = await PublishedVideo.findByIdAndUpdate(
+        id,
+        { extractIds, updatedAt: Date.now() },
+        { new: true }
+      );
+
+      if (!publishedVideo) throw new Error('Published video not found');
+      return publishedVideo;
+    },
+
+    deletePublishedVideo: async (_, { id }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const result = await PublishedVideo.deleteOne({ _id: id });
+      return result.deletedCount > 0;
+    },
   },
 
   Extract: {
@@ -309,6 +387,45 @@ export const resolvers = {
         console.error('Error fetching anime:', error);
         return null;
       }
+    },
+    isUsedInVideo: async (parent) => {
+      // Check if this extract is used in any video (from Video collection)
+      const video = await Video.findOne({
+        'segments.extractId': parent._id
+      });
+
+      // Also check if it's linked to any published YouTube video
+      const publishedVideo = await PublishedVideo.findOne({
+        extractIds: parent._id
+      });
+
+      return !!(video || publishedVideo);
+    },
+  },
+
+  VideoSegment: {
+    extract: async (parent) => {
+      if (parent.extractId) {
+        const extract = await Extract.findById(parent.extractId).populate('themeId');
+        return extract;
+      }
+      return null;
+    },
+  },
+
+  Theme: {
+    extractCount: async (parent) => {
+      const count = await Extract.countDocuments({ themeId: parent._id });
+      return count;
+    },
+  },
+
+  PublishedVideo: {
+    extracts: async (parent) => {
+      if (parent.extractIds && parent.extractIds.length > 0) {
+        return await Extract.find({ _id: { $in: parent.extractIds } }).populate('themeId');
+      }
+      return [];
     },
   },
 };

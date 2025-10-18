@@ -69,6 +69,7 @@ export const typeDefs = `#graphql
     extractId: ID!
     text: String!
     order: Int!
+    extract: Extract
   }
 
   type Video {
@@ -78,6 +79,26 @@ export const typeDefs = `#graphql
     tags: String!
     segments: [VideoSegment!]!
     musicTracks: [SpotifyTrack!]!
+    isPublished: Boolean!
+    youtubeVideoId: String
+    userId: ID!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type PublishedVideo {
+    id: ID!
+    youtubeVideoId: String!
+    title: String!
+    description: String
+    thumbnail: String
+    publishedAt: String
+    duration: String
+    viewCount: Int
+    likeCount: Int
+    commentCount: Int
+    extractIds: [ID!]!
+    extracts: [Extract!]!
     userId: ID!
     createdAt: String!
     updatedAt: String!
@@ -120,6 +141,7 @@ export const typeDefs = `#graphql
     userId: ID!
     createdAt: String!
     updatedAt: String!
+    extractCount: Int!
   }
 
   type Extract {
@@ -139,6 +161,7 @@ export const typeDefs = `#graphql
     userId: ID!
     createdAt: String!
     updatedAt: String!
+    isUsedInVideo: Boolean!
   }
 
   enum APISource {
@@ -239,6 +262,19 @@ export const typeDefs = `#graphql
     musicTracks: [SpotifyTrackInput!]
   }
 
+  input LinkPublishedVideoInput {
+    youtubeVideoId: String!
+    title: String!
+    description: String
+    thumbnail: String
+    publishedAt: String
+    duration: String
+    viewCount: Int
+    likeCount: Int
+    commentCount: Int
+    extractIds: [ID!]!
+  }
+
   type AuthPayload {
     token: String!
     user: User!
@@ -276,6 +312,11 @@ export const typeDefs = `#graphql
     # Videos
     videos(limit: Int, offset: Int): [Video!]!
     video(id: ID!): Video
+
+    # Published Videos
+    publishedVideos(limit: Int, offset: Int): [PublishedVideo!]!
+    publishedVideo(id: ID!): PublishedVideo
+    publishedVideoByYoutubeId(youtubeVideoId: String!): PublishedVideo
   }
 
   type Mutation {
@@ -299,5 +340,11 @@ export const typeDefs = `#graphql
     createVideo(input: CreateVideoInput!): Video!
     updateVideo(id: ID!, input: UpdateVideoInput!): Video!
     deleteVideo(id: ID!): Boolean!
+    publishVideo(id: ID!, youtubeVideoId: String!): Video!
+
+    # Published Videos
+    linkPublishedVideo(input: LinkPublishedVideoInput!): PublishedVideo!
+    updatePublishedVideo(id: ID!, extractIds: [ID!]!): PublishedVideo!
+    deletePublishedVideo(id: ID!): Boolean!
   }
 `;

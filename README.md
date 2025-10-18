@@ -10,6 +10,11 @@ Backend GraphQL API for managing anime extracts for Solo Geek YouTube channel.
 - MyAnimeList & Jikan API integration
 - Extract management with themes and characters
 - Character search by anime
+- Video creation and management
+- YouTube channel integration
+- Spotify music search integration
+- Extract usage tracking across videos
+- Published video linking system
 
 ## Tech Stack
 
@@ -189,12 +194,16 @@ solo-base-notes/
 ├── models/
 │   ├── User.js              # User schema
 │   ├── Extract.js           # Extract schema
-│   └── Theme.js             # Theme schema
+│   ├── Theme.js             # Theme schema
+│   ├── Video.js             # Video schema
+│   └── PublishedVideo.js    # Published video schema
 ├── routes/
 │   └── auth.js              # OAuth routes
 ├── services/
 │   ├── jikanService.js      # Jikan API integration
-│   └── malService.js        # MyAnimeList API integration
+│   ├── malService.js        # MyAnimeList API integration
+│   ├── youtubeService.js    # YouTube Data API integration
+│   └── spotifyService.js    # Spotify API integration
 ├── .env.example             # Environment variables template
 ├── server.js                # Main server file
 └── package.json
@@ -209,11 +218,26 @@ solo-base-notes/
 ### Theme
 - name, description, color
 - User-specific themes for video categories
+- Computed field: extractCount (number of extracts per theme)
 
 ### Extract
 - text, characters, animeId, timing, season, episode
 - Links to theme and user
 - Stores anime metadata (title, image)
+- Computed field: isUsedInVideo (tracks if extract is used in any video)
+
+### Video
+- title, description, tags, segments, musicTracks
+- segments: array of extract references with order
+- musicTracks: Spotify track data
+- isPublished: boolean flag for publication status
+- youtubeVideoId: optional YouTube video ID when published
+
+### PublishedVideo
+- youtubeVideoId, title, description, thumbnail
+- extractIds: array of extract references used in the video
+- YouTube metadata: viewCount, likeCount, commentCount
+- Links already-published YouTube videos to extracts
 
 ## API Sources
 
@@ -226,6 +250,17 @@ solo-base-notes/
 - Requires client ID
 - More accurate data
 - No character endpoint (use Jikan for characters)
+
+### YouTube Data API v3
+- Requires API key
+- Channel information retrieval
+- Video list and metadata
+- Short detection based on video duration (≤60s)
+
+### Spotify Web API
+- Requires client ID and secret
+- Track search functionality
+- Full track metadata including album and artist info
 
 ## License
 

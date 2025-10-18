@@ -102,6 +102,14 @@ const videoSchema = new mongoose.Schema({
     type: [spotifyTrackSchema],
     default: [],
   },
+  isPublished: {
+    type: Boolean,
+    default: false,
+  },
+  youtubeVideoId: {
+    type: String,
+    default: null,
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
