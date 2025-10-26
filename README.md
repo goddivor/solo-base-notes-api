@@ -10,6 +10,9 @@ Backend GraphQL API for managing anime extracts for Solo Geek YouTube channel.
 - MyAnimeList & Jikan API integration
 - Extract management with themes and characters
 - Character search by anime
+- **Subtitle auto-fill with OpenSubtitles API integration**
+- **Anime ID mapping with ARM and ids.moe services**
+- **AI-powered text correction with Gemini API**
 - Video creation and management
 - YouTube channel integration
 - Spotify music search integration
@@ -49,6 +52,9 @@ cp .env.example .env
    - Google OAuth credentials (get from Google Cloud Console)
    - JWT secret
    - Port and frontend URL
+   - OpenSubtitles API credentials (API key, username, password)
+   - ids.moe API key (optional, for ID mapping)
+   - Gemini API key (for AI text correction)
 
 ### Get Google OAuth Credentials
 
@@ -200,10 +206,15 @@ solo-base-notes/
 ├── routes/
 │   └── auth.js              # OAuth routes
 ├── services/
-│   ├── jikanService.js      # Jikan API integration
-│   ├── malService.js        # MyAnimeList API integration
-│   ├── youtubeService.js    # YouTube Data API integration
-│   └── spotifyService.js    # Spotify API integration
+│   ├── jikanService.js          # Jikan API integration
+│   ├── malService.js            # MyAnimeList API integration
+│   ├── youtubeService.js        # YouTube Data API integration
+│   ├── spotifyService.js        # Spotify API integration
+│   ├── openSubtitlesService.js  # OpenSubtitles API integration
+│   ├── armService.js            # ARM ID mapping service
+│   ├── idsMoeService.js         # ids.moe ID mapping service
+│   ├── mappingService.js        # Unified ID mapping interface
+│   └── geminiService.js         # Gemini AI service
 ├── .env.example             # Environment variables template
 ├── server.js                # Main server file
 └── package.json
@@ -261,6 +272,24 @@ solo-base-notes/
 - Requires client ID and secret
 - Track search functionality
 - Full track metadata including album and artist info
+
+### OpenSubtitles API
+- Requires API key, username, and password
+- Automatic subtitle search by IMDb ID
+- SRT file download and parsing
+- Text extraction by time range
+- Support for multiple languages (EN, FR)
+
+### Anime ID Mapping Services
+- **ARM (anime-relations-mapper)**: No authentication required, default service
+- **ids.moe**: Requires API key, fallback service
+- Converts MyAnimeList IDs to IMDb IDs for subtitle search
+- Automatic fallback mechanism for reliability
+
+### Gemini AI API
+- Requires API key
+- AI-powered text correction and spelling fixes
+- Theme suggestions based on extract text
 
 ## License
 
