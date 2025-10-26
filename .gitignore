@@ -20,3 +20,5 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+idsmoe-anime-id-mapping-api.json
+openapi.json
