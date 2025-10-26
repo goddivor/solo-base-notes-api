@@ -1,5 +1,6 @@
 import Extract from '../models/Extract.js';
 import Theme from '../models/Theme.js';
+import ThemeGroup from '../models/ThemeGroup.js';
 import User from '../models/User.js';
 import Video from '../models/Video.js';
 import PublishedVideo from '../models/PublishedVideo.js';
@@ -8,6 +9,9 @@ import jikanService from '../services/jikanService.js';
 import malService from '../services/malService.js';
 import { getYouTubeChannelInfo, getYouTubeChannelVideos } from '../services/youtubeService.js';
 import { searchTracks, getTrack } from '../services/spotifyService.js';
+import { correctSpelling, suggestThemeGroups, suggestThemeFromText } from '../services/geminiService.js';
+import { getImdbIdFromMal } from '../services/mappingService.js';
+import { searchSubtitles as searchSubtitlesService, downloadSubtitle, parseSRT, extractTextByTiming } from '../services/openSubtitlesService.js';
 
 export const resolvers = {
   Query: {
@@ -67,6 +71,52 @@ export const resolvers = {
       return theme;
     },
 
+    // Theme Groups
+    themeGroups: async (_, __, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+      return await ThemeGroup.find({}).sort({ createdAt: -1 }).populate('themes');
+    },
+
+    themeGroup: async (_, { id }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const themeGroup = await ThemeGroup.findById(id).populate('themes');
+      if (!themeGroup) throw new Error('Theme group not found');
+      return themeGroup;
+    },
+
+    suggestThemeGroups: async (_, __, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      try {
+        // Get all themes
+        const themes = await Theme.find({}).select('id name description color');
+
+        if (themes.length < 2) {
+          throw new Error('Need at least 2 themes to suggest groups');
+        }
+
+        // Get AI suggestions
+        const suggestions = await suggestThemeGroups(themes);
+        return suggestions;
+      } catch (error) {
+        console.error('Error in suggestThemeGroups query:', error);
+        throw new Error(`Failed to suggest theme groups: ${error.message}`);
+      }
+    },
+
+    suggestThemeFromText: async (_, { text }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      try {
+        const suggestion = await suggestThemeFromText(text);
+        return suggestion;
+      } catch (error) {
+        console.error('Error in suggestThemeFromText query:', error);
+        throw new Error(`Failed to suggest theme: ${error.message}`);
+      }
+    },
+
     // Anime APIs
     searchAnime: async (_, { query, source }) => {
       if (source === 'MAL') {
@@ -90,6 +140,68 @@ export const resolvers = {
     getAnimeEpisodes: async (_, { animeId, source }) => {
       // Always use Jikan for episodes as MAL API v2 doesn't support it
       return await jikanService.getAnimeEpisodes(animeId);
+    },
+
+    // Subtitles
+    searchSubtitles: async (_, { animeId, season, episode, languages, mappingService = 'arm' }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      try {
+        // Get IMDb ID from MAL ID using the selected mapping service (ARM or ids.moe)
+        console.log(`Using ${mappingService} service to map MAL ID ${animeId} to IMDb ID...`);
+        const imdbId = await getImdbIdFromMal(animeId, mappingService);
+
+        if (!imdbId) {
+          console.log(`No IMDb ID found for MAL ID ${animeId} using ${mappingService}`);
+          return [];
+        }
+
+        console.log(`Found IMDb ID: ${imdbId}`);
+
+        // Search subtitles using OpenSubtitles API
+        const subtitles = await searchSubtitlesService(imdbId, season, episode, languages);
+        return subtitles;
+      } catch (error) {
+        console.error('Error searching subtitles:', error);
+        throw new Error(`Failed to search subtitles: ${error.message}`);
+      }
+    },
+
+    downloadSubtitle: async (_, { fileId }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      try {
+        // Download subtitle file
+        const srtContent = await downloadSubtitle(fileId);
+
+        // Parse SRT format
+        const parsedSubtitles = parseSRT(srtContent);
+
+        return { entries: parsedSubtitles };
+      } catch (error) {
+        console.error('Error downloading subtitle:', error);
+        throw new Error(`Failed to download subtitle: ${error.message}`);
+      }
+    },
+
+    extractSubtitleText: async (_, { fileId, startTime, endTime }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      try {
+        // Download subtitle file
+        const srtContent = await downloadSubtitle(fileId);
+
+        // Parse SRT format
+        const parsedSubtitles = parseSRT(srtContent);
+
+        // Extract text within the specified time range
+        const text = extractTextByTiming(parsedSubtitles, startTime, endTime);
+
+        return { text };
+      } catch (error) {
+        console.error('Error extracting subtitle text:', error);
+        throw new Error(`Failed to extract subtitle text: ${error.message}`);
+      }
     },
 
     // YouTube
@@ -238,6 +350,51 @@ export const resolvers = {
       return result.deletedCount > 0;
     },
 
+    // Theme Groups
+    createThemeGroup: async (_, { input }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const themeGroup = new ThemeGroup({
+        name: input.name,
+        description: input.description,
+        color: input.color,
+        themes: input.themeIds || [],
+        userId: user.id,
+      });
+
+      await themeGroup.save();
+      return await ThemeGroup.findById(themeGroup._id).populate('themes');
+    },
+
+    updateThemeGroup: async (_, { id, input }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const updateData = {
+        updatedAt: Date.now(),
+      };
+
+      if (input.name !== undefined) updateData.name = input.name;
+      if (input.description !== undefined) updateData.description = input.description;
+      if (input.color !== undefined) updateData.color = input.color;
+      if (input.themeIds !== undefined) updateData.themes = input.themeIds;
+
+      const themeGroup = await ThemeGroup.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true }
+      ).populate('themes');
+
+      if (!themeGroup) throw new Error('Theme group not found');
+      return themeGroup;
+    },
+
+    deleteThemeGroup: async (_, { id }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const result = await ThemeGroup.deleteOne({ _id: id });
+      return result.deletedCount > 0;
+    },
+
     // Settings
     updateSettings: async (_, { youtubeChannelUrl }, { user }) => {
       if (!user) throw new Error('Not authenticated');
@@ -368,6 +525,19 @@ export const resolvers = {
       const result = await PublishedVideo.deleteOne({ _id: id });
       return result.deletedCount > 0;
     },
+
+    // AI Services
+    correctSpelling: async (_, { text }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      try {
+        const correctedText = await correctSpelling(text);
+        return correctedText;
+      } catch (error) {
+        console.error('Error in correctSpelling mutation:', error);
+        throw new Error(`Failed to correct spelling: ${error.message}`);
+      }
+    },
   },
 
   Extract: {
@@ -416,6 +586,18 @@ export const resolvers = {
   Theme: {
     extractCount: async (parent) => {
       const count = await Extract.countDocuments({ themeId: parent._id });
+      return count;
+    },
+  },
+
+  ThemeGroup: {
+    extractCount: async (parent) => {
+      // Count all extracts that belong to any of the themes in this group
+      if (!parent.themes || parent.themes.length === 0) {
+        return 0;
+      }
+      const themeIds = parent.themes.map(theme => theme._id || theme);
+      const count = await Extract.countDocuments({ themeId: { $in: themeIds } });
       return count;
     },
   },

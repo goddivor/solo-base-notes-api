@@ -133,6 +133,30 @@ export const typeDefs = `#graphql
     duration: Int
   }
 
+  type Subtitle {
+    fileId: String!
+    fileName: String!
+    language: String!
+    downloadCount: Int!
+    rating: Float!
+    release: String!
+    uploader: String!
+  }
+
+  type SubtitleText {
+    text: String!
+  }
+
+  type SubtitleEntry {
+    startTime: String!
+    endTime: String!
+    text: String!
+  }
+
+  type ParsedSubtitle {
+    entries: [SubtitleEntry!]!
+  }
+
   type Theme {
     id: ID!
     name: String!
@@ -142,6 +166,30 @@ export const typeDefs = `#graphql
     createdAt: String!
     updatedAt: String!
     extractCount: Int!
+  }
+
+  type ThemeGroup {
+    id: ID!
+    name: String!
+    description: String
+    color: String!
+    themes: [Theme!]!
+    userId: ID!
+    createdAt: String!
+    updatedAt: String!
+    extractCount: Int!
+  }
+
+  type ThemeGroupSuggestion {
+    name: String!
+    description: String
+    themeIds: [ID!]!
+    color: String!
+  }
+
+  type ThemeSuggestion {
+    name: String!
+    description: String!
   }
 
   type Extract {
@@ -216,6 +264,20 @@ export const typeDefs = `#graphql
     name: String
     description: String
     color: String
+  }
+
+  input CreateThemeGroupInput {
+    name: String!
+    description: String
+    color: String
+    themeIds: [ID!]
+  }
+
+  input UpdateThemeGroupInput {
+    name: String
+    description: String
+    color: String
+    themeIds: [ID!]
   }
 
   input VideoSegmentInput {
@@ -295,11 +357,22 @@ export const typeDefs = `#graphql
     themes: [Theme!]!
     theme(id: ID!): Theme
 
+    # Theme Groups
+    themeGroups: [ThemeGroup!]!
+    themeGroup(id: ID!): ThemeGroup
+    suggestThemeGroups: [ThemeGroupSuggestion!]!
+    suggestThemeFromText(text: String!): ThemeSuggestion!
+
     # Anime APIs
     searchAnime(query: String!, source: APISource!): [Anime!]!
     getAnime(id: Int!, source: APISource!): Anime
     getAnimeCharacters(animeId: Int!, source: APISource!): [Character!]!
     getAnimeEpisodes(animeId: Int!, source: APISource!): [Episode!]!
+
+    # Subtitles
+    searchSubtitles(animeId: Int!, season: Int, episode: Int!, languages: [String!]!, mappingService: String): [Subtitle!]!
+    downloadSubtitle(fileId: String!): ParsedSubtitle!
+    extractSubtitleText(fileId: String!, startTime: String!, endTime: String!): SubtitleText!
 
     # YouTube
     getYouTubeChannelInfo(url: String!): YouTubeChannel!
@@ -330,6 +403,11 @@ export const typeDefs = `#graphql
     updateTheme(id: ID!, input: UpdateThemeInput!): Theme!
     deleteTheme(id: ID!): Boolean!
 
+    # Theme Groups
+    createThemeGroup(input: CreateThemeGroupInput!): ThemeGroup!
+    updateThemeGroup(id: ID!, input: UpdateThemeGroupInput!): ThemeGroup!
+    deleteThemeGroup(id: ID!): Boolean!
+
     # Settings
     updateSettings(youtubeChannelUrl: String): Settings!
 
@@ -346,5 +424,8 @@ export const typeDefs = `#graphql
     linkPublishedVideo(input: LinkPublishedVideoInput!): PublishedVideo!
     updatePublishedVideo(id: ID!, extractIds: [ID!]!): PublishedVideo!
     deletePublishedVideo(id: ID!): Boolean!
+
+    # AI Services
+    correctSpelling(text: String!): String!
   }
 `;
