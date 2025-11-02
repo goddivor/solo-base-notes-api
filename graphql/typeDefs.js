@@ -361,6 +361,7 @@ export const typeDefs = `#graphql
     themeGroups: [ThemeGroup!]!
     themeGroup(id: ID!): ThemeGroup
     suggestThemeGroups: [ThemeGroupSuggestion!]!
+    suggestCustomThemeGroups(userInput: String!): [ThemeGroupSuggestion!]!
     suggestThemeFromText(text: String!): ThemeSuggestion!
 
     # Anime APIs
@@ -427,5 +428,6 @@ export const typeDefs = `#graphql
 
     # AI Services
     correctSpelling(text: String!): String!
+    translateText(text: String!): String!
   }
 `;

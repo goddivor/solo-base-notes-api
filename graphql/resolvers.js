@@ -9,7 +9,7 @@ import jikanService from '../services/jikanService.js';
 import malService from '../services/malService.js';
 import { getYouTubeChannelInfo, getYouTubeChannelVideos } from '../services/youtubeService.js';
 import { searchTracks, getTrack } from '../services/spotifyService.js';
-import { correctSpelling, suggestThemeGroups, suggestThemeFromText } from '../services/geminiService.js';
+import { correctSpelling, suggestThemeGroups, suggestCustomThemeGroups, suggestThemeFromText, translateText } from '../services/geminiService.js';
 import { getImdbIdFromMal } from '../services/mappingService.js';
 import { searchSubtitles as searchSubtitlesService, downloadSubtitle, parseSRT, extractTextByTiming } from '../services/openSubtitlesService.js';
 
@@ -89,19 +89,146 @@ export const resolvers = {
       if (!user) throw new Error('Not authenticated');
 
       try {
-        // Get all themes
-        const themes = await Theme.find({}).select('id name description color');
+        // Get all existing theme groups
+        const existingGroups = await ThemeGroup.find({});
 
-        if (themes.length < 2) {
-          throw new Error('Need at least 2 themes to suggest groups');
+        // Extract all theme IDs that are already used in groups
+        const usedThemeIds = new Set();
+        existingGroups.forEach(group => {
+          if (group.themes && group.themes.length > 0) {
+            group.themes.forEach(themeId => {
+              usedThemeIds.add(themeId.toString());
+            });
+          }
+        });
+
+        // Get all themes
+        const allThemes = await Theme.find({}).select('id name description color');
+
+        // Filter out themes that are already used in groups
+        let availableThemes = allThemes.filter(theme =>
+          !usedThemeIds.has(theme._id.toString())
+        );
+
+        // Additionally, filter out themes where ALL extracts are already used
+        const themesWithAvailableExtracts = [];
+
+        for (const theme of availableThemes) {
+          // Get all extracts for this theme
+          const themeExtracts = await Extract.find({ themeId: theme._id });
+
+          // If the theme has no extracts at all, skip it
+          if (themeExtracts.length === 0) {
+            continue;
+          }
+
+          // Check if at least one extract is available (not used in any video)
+          let hasAvailableExtract = false;
+
+          for (const extract of themeExtracts) {
+            // Check if extract is used in a video
+            const usedInVideo = await Video.findOne({
+              'segments.extractId': extract._id
+            });
+
+            // Check if extract is linked to a published video
+            const linkedToPublished = await PublishedVideo.findOne({
+              extractIds: extract._id
+            });
+
+            // If extract is not used anywhere, the theme has available extracts
+            if (!usedInVideo && !linkedToPublished) {
+              hasAvailableExtract = true;
+              break; // No need to check other extracts
+            }
+          }
+
+          // Only include theme if it has at least one available extract
+          if (hasAvailableExtract) {
+            themesWithAvailableExtracts.push(theme);
+          }
         }
 
-        // Get AI suggestions
-        const suggestions = await suggestThemeGroups(themes);
+        if (themesWithAvailableExtracts.length < 2) {
+          throw new Error('Need at least 2 themes with available extracts to suggest groups');
+        }
+
+        // Get AI suggestions using only themes with available extracts
+        const suggestions = await suggestThemeGroups(themesWithAvailableExtracts);
         return suggestions;
       } catch (error) {
         console.error('Error in suggestThemeGroups query:', error);
         throw new Error(`Failed to suggest theme groups: ${error.message}`);
+      }
+    },
+
+    suggestCustomThemeGroups: async (_, { userInput }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      try {
+        // Get all existing theme groups
+        const existingGroups = await ThemeGroup.find({});
+
+        // Extract all theme IDs that are already used in groups
+        const usedThemeIds = new Set();
+        existingGroups.forEach(group => {
+          if (group.themes && group.themes.length > 0) {
+            group.themes.forEach(themeId => {
+              usedThemeIds.add(themeId.toString());
+            });
+          }
+        });
+
+        // Get all themes
+        const allThemes = await Theme.find({}).select('id name description color');
+
+        // Filter out themes that are already used in groups
+        let availableThemes = allThemes.filter(theme =>
+          !usedThemeIds.has(theme._id.toString())
+        );
+
+        // Additionally, filter out themes where ALL extracts are already used
+        const themesWithAvailableExtracts = [];
+
+        for (const theme of availableThemes) {
+          const themeExtracts = await Extract.find({ themeId: theme._id });
+
+          if (themeExtracts.length === 0) {
+            continue;
+          }
+
+          let hasAvailableExtract = false;
+
+          for (const extract of themeExtracts) {
+            const usedInVideo = await Video.findOne({
+              'segments.extractId': extract._id
+            });
+
+            const linkedToPublished = await PublishedVideo.findOne({
+              extractIds: extract._id
+            });
+
+            if (!usedInVideo && !linkedToPublished) {
+              hasAvailableExtract = true;
+              break;
+            }
+          }
+
+          if (hasAvailableExtract) {
+            themesWithAvailableExtracts.push(theme);
+          }
+        }
+
+        if (themesWithAvailableExtracts.length < 2) {
+          throw new Error('Need at least 2 themes with available extracts to suggest groups');
+        }
+
+        // Get AI suggestions using user input and available themes
+        const suggestions = await suggestCustomThemeGroups(themesWithAvailableExtracts, userInput);
+        return suggestions;
+      } catch (error) {
+        console.error('Error in suggestCustomThemeGroups query:', error);
+        throw new Error(`Failed to suggest custom theme groups: ${error.message}`);
       }
     },
 
@@ -536,6 +663,18 @@ export const resolvers = {
       } catch (error) {
         console.error('Error in correctSpelling mutation:', error);
         throw new Error(`Failed to correct spelling: ${error.message}`);
+      }
+    },
+
+    translateText: async (_, { text }, { user }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      try {
+        const translatedText = await translateText(text);
+        return translatedText;
+      } catch (error) {
+        console.error('Error in translateText mutation:', error);
+        throw new Error(`Failed to translate text: ${error.message}`);
       }
     },
   },
